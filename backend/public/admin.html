@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PLOTIQ Admin</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  :root{ --ink:#10162a; --muted:#5b6480; --line:#d3d9e6; --surface:#fff; --canvas:#eef1f6; --accent:#c1662a; --accentSoft:#f3e0cf; --good:#1f8f5f; --goodBg:#e3f5ec; --bad:#c23b3b; }
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:var(--canvas);color:var(--ink);
+    padding:24px 24px calc(24px + 66px);} /* bottom padding clears the fixed footer */
+  h1{margin:0 0 4px;font-size:22px;}
+  p.sub{color:var(--muted);margin:0 0 18px;font-size:13px;}
+  .layout{max-width:640px;margin:0 auto;}
+
+  /* Two separate pages (Listings / Add·Edit) instead of both crammed onto
+     one screen at once — switched by the tab icons below the title. */
+  .tabs{display:flex;gap:8px;max-width:640px;margin:0 auto 18px;}
+  .tabBtn{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;
+    border:1px solid var(--line);border-radius:10px;padding:10px;background:var(--surface);color:var(--ink);}
+  .tabBtn svg{width:17px;height:17px;}
+  .tabBtn span{font-size:13px;font-weight:600;}
+  .tabBtn.active{background:var(--ink);border-color:var(--ink);color:#fff;}
+  .view{display:none;}
+  .view.active{display:block;}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;}
+  .card h2{font-size:15px;margin:0 0 14px;}
+  label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px;}
+  input,select{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:7px;font-size:13px;font-family:inherit;}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  button{cursor:pointer;font-family:inherit;font-size:13px;border-radius:8px;border:1px solid var(--line);background:var(--surface);padding:7px 12px;}
+  button.primary{background:var(--ink);color:#fff;border-color:var(--ink);}
+  button.danger{color:var(--bad);border-color:var(--bad);}
+  #saveBtn{width:100%;margin-top:14px;padding:10px;}
+  #status{font-size:12px;color:var(--muted);margin-top:8px;min-height:16px;}
+
+  /* Listings — one card per plot, stacked vertically. No side-scrolling
+     table: on a phone that meant swiping to see price, status, and NOC
+     one at a time, which is exactly the "hard to see everything" problem
+     this replaces (same lesson already applied to the app's Compare view). */
+  .listHeader{font-size:15px;font-weight:600;margin:0 0 12px;}
+  .plotList{display:flex;flex-direction:column;gap:10px;}
+  .plotCard{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;}
+  .plotCard .top{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
+  .plotCard .name{font-size:14.5px;font-weight:600;}
+  .plotCard .meta{font-size:11.5px;color:var(--muted);margin-top:2px;text-transform:capitalize;}
+  .plotCard .price{font-size:14.5px;font-weight:600;white-space:nowrap;}
+  .plotCard .badges{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
+  .pill{display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;}
+  .pill.ok{background:var(--goodBg);color:var(--good);}
+  .pill.pending{background:var(--accentSoft);color:var(--accent);}
+  .pill.neutral{background:#eef1f6;color:var(--muted);}
+  .plotCard .row{display:flex;justify-content:space-between;font-size:12px;padding:6px 0;border-top:1px dashed var(--line);margin-top:10px;}
+  .plotCard .row span:first-child{color:var(--muted);}
+  .plotCard .actions{display:flex;gap:8px;margin-top:10px;}
+  .plotCard .actions button{flex:1;}
+
+  /* Footer nav — Back / Home / Menu, same 3-button pattern as the app,
+     since this page is a separate origin the app opens in the browser
+     and otherwise has no way back to it. */
+  .footerbar{position:fixed;left:0;right:0;bottom:0;display:flex;justify-content:space-around;
+    background:var(--surface);border-top:1px solid var(--line);padding:8px 10px calc(8px + env(safe-area-inset-bottom,0px));
+    z-index:10;}
+  .footerbar button{background:none;border:none;display:flex;flex-direction:column;align-items:center;gap:2px;
+    padding:6px 18px;border-radius:10px;color:var(--muted);}
+  .footerbar button:hover{background:#eef1f6;color:var(--ink);}
+  .footerbar svg{width:20px;height:20px;}
+  .footerbar span{font-size:9px;font-weight:600;letter-spacing:.3px;text-transform:uppercase;}
+</style>
+</head>
+<body>
+  <h1>PLOTIQ Admin</h1>
+  <p class="sub">Add, edit, and remove land listings — no login (local tool only, see backend/README.md).</p>
+
+  <div class="tabs">
+    <button class="tabBtn" id="tabListings" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13M8 12h13M8 18h13"/><circle cx="3" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="3" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="3" cy="18" r="1.4" fill="currentColor" stroke="none"/></svg>
+      <span>Listings</span>
+    </button>
+    <button class="tabBtn" id="tabForm" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
+      <span>Add / Edit</span>
+    </button>
+  </div>
+
+  <div class="layout">
+    <div class="view" id="listingsView">
+      <p class="listHeader" id="listHeader">Listings</p>
+      <div class="plotList" id="rows"></div>
+    </div>
+
+    <div class="view" id="formView">
+    <div class="card">
+      <h2 id="formTitle">Add a plot</h2>
+      <form id="plotForm">
+        <input type="hidden" id="id">
+        <label>Sector / Society</label>
+        <input id="sector" required placeholder="e.g. F-11">
+        <div class="row2">
+          <div><label>Block (optional)</label><input id="block" placeholder="Block C"></div>
+          <div><label>Type</label>
+            <select id="type">
+              <option value="residential">Residential</option>
+              <option value="commercial">Commercial</option>
+              <option value="industrial">Industrial</option>
+              <option value="farmhouse">Farmhouse</option>
+            </select>
+          </div>
+        </div>
+        <label>Available sizes (Marla, comma-separated)</label>
+        <input id="sizes" required placeholder="5, 7, 10">
+        <div class="row2">
+          <div><label>Price per Marla (lac)</label><input id="pricePerMarlaLac" type="number" step="0.1" required></div>
+          <div><label>Distance (minutes to city)</label><input id="distanceMinutes" type="number" required></div>
+        </div>
+        <label>Distance label</label>
+        <input id="distance" required placeholder="20 min from city center">
+        <label>Vibe tags (comma-separated)</label>
+        <input id="vibe" placeholder="gated, quiet, central">
+        <div class="row2">
+          <div><label>Development status</label>
+            <select id="developmentStatus">
+              <option value="developed">Developed</option>
+              <option value="semi-developed">Semi-developed</option>
+              <option value="undeveloped">Undeveloped</option>
+              <option value="possession-available">Possession available</option>
+            </select>
+          </div>
+          <div><label>NOC status</label>
+            <select id="nocApproved">
+              <option value="1">Approved</option>
+              <option value="0">Pending / unverified</option>
+            </select>
+          </div>
+        </div>
+        <label>Legal status note</label>
+        <input id="legalStatus" placeholder="CDA Approved · NOC Verified">
+        <label>Amenities (comma-separated)</label>
+        <input id="amenities" placeholder="school, hospital, mosque, market">
+        <label>Agent name</label>
+        <input id="agentName" placeholder="Ahmed Raza">
+        <div class="row2">
+          <div><label>Agent phone</label><input id="agentPhone" placeholder="+923001112201"></div>
+          <div><label>Agent WhatsApp</label><input id="agentWhatsapp" placeholder="923001112201"></div>
+        </div>
+        <button type="submit" class="primary" id="saveBtn">Add plot</button>
+        <button type="button" id="cancelBtn" style="width:100%;margin-top:8px;display:none;">Cancel edit</button>
+        <div id="status"></div>
+      </form>
+    </div>
+    </div>
+  </div>
+
+  <div class="footerbar">
+    <button id="backBtn" aria-label="Back">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/><path d="M8 12h9"/></svg>
+      <span>Back</span>
+    </button>
+    <button id="homeBtn" aria-label="Home">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.5L12 4l8 7.5"/><path d="M6 10v9h12v-9"/><path d="M10 19v-5h4v5"/></svg>
+      <span>Home</span>
+    </button>
+    <button id="menuBtn" aria-label="Menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      <span>Menu</span>
+    </button>
+  </div>
+
+<script>
+const API = '/api/plots';
+const form = document.getElementById('plotForm');
+const rowsEl = document.getElementById('rows');
+const listHeader = document.getElementById('listHeader');
+const statusEl = document.getElementById('status');
+const cancelBtn = document.getElementById('cancelBtn');
+const saveBtn = document.getElementById('saveBtn');
+const formTitle = document.getElementById('formTitle');
+
+// ---- two separate pages, switched by the tab icons (not both crammed
+// onto one screen) ----
+function showView(name){ // 'listings' | 'form'
+  document.getElementById('listingsView').classList.toggle('active', name === 'listings');
+  document.getElementById('formView').classList.toggle('active', name === 'form');
+  document.getElementById('tabListings').classList.toggle('active', name === 'listings');
+  document.getElementById('tabForm').classList.toggle('active', name === 'form');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+document.getElementById('tabListings').onclick = () => showView('listings');
+document.getElementById('tabForm').onclick = () => showView('form');
+
+// ---- footer nav: Back = browser history, Home = the PLOTIQ app itself
+// (same host, the app's dev port), Menu = start a fresh "Add a plot" —
+// this page's own equivalent of the app's "New search". ----
+document.getElementById('backBtn').onclick = () => {
+  if (history.length > 1) history.back();
+  else window.location.href = `${location.protocol}//${location.hostname}:8090`;
+};
+document.getElementById('homeBtn').onclick = () => {
+  window.location.href = `${location.protocol}//${location.hostname}:8090`;
+};
+document.getElementById('menuBtn').onclick = () => {
+  resetForm();
+  showView('form');
+  document.getElementById('sector').focus();
+};
+
+function splitList(v){ return v.split(',').map(s=>s.trim()).filter(Boolean); }
+function splitNums(v){ return splitList(v).map(Number).filter(n=>!isNaN(n)); }
+
+function readForm(){
+  return {
+    sector: document.getElementById('sector').value.trim(),
+    block: document.getElementById('block').value.trim() || null,
+    type: document.getElementById('type').value,
+    sizes: splitNums(document.getElementById('sizes').value),
+    pricePerMarlaLac: parseFloat(document.getElementById('pricePerMarlaLac').value),
+    distanceMinutes: parseInt(document.getElementById('distanceMinutes').value, 10),
+    distance: document.getElementById('distance').value.trim(),
+    vibe: splitList(document.getElementById('vibe').value),
+    developmentStatus: document.getElementById('developmentStatus').value,
+    nocApproved: document.getElementById('nocApproved').value === '1',
+    legalStatus: document.getElementById('legalStatus').value.trim(),
+    amenities: splitList(document.getElementById('amenities').value),
+    agent: {
+      name: document.getElementById('agentName').value.trim(),
+      phone: document.getElementById('agentPhone').value.trim(),
+      whatsapp: document.getElementById('agentWhatsapp').value.trim(),
+    },
+  };
+}
+
+function fillForm(p){
+  document.getElementById('id').value = p.id;
+  document.getElementById('sector').value = p.sector;
+  document.getElementById('block').value = p.block || '';
+  document.getElementById('type').value = p.type;
+  document.getElementById('sizes').value = p.sizes.join(', ');
+  document.getElementById('pricePerMarlaLac').value = p.pricePerMarlaLac;
+  document.getElementById('distanceMinutes').value = p.distanceMinutes;
+  document.getElementById('distance').value = p.distance;
+  document.getElementById('vibe').value = p.vibe.join(', ');
+  document.getElementById('developmentStatus').value = p.developmentStatus || 'developed';
+  document.getElementById('nocApproved').value = p.nocApproved ? '1' : '0';
+  document.getElementById('legalStatus').value = p.legalStatus || '';
+  document.getElementById('amenities').value = (p.amenities||[]).join(', ');
+  document.getElementById('agentName').value = p.agent?.name || '';
+  document.getElementById('agentPhone').value = p.agent?.phone || '';
+  document.getElementById('agentWhatsapp').value = p.agent?.whatsapp || '';
+  formTitle.textContent = 'Edit plot #' + p.id;
+  saveBtn.textContent = 'Save changes';
+  cancelBtn.style.display = 'block';
+  showView('form');
+}
+
+function resetForm(){
+  form.reset();
+  document.getElementById('id').value = '';
+  formTitle.textContent = 'Add a plot';
+  saveBtn.textContent = 'Add plot';
+  cancelBtn.style.display = 'none';
+}
+
+async function loadRows(){
+  const res = await fetch(API);
+  const { plots } = await res.json();
+  listHeader.textContent = `Listings (${plots.length})`;
+  rowsEl.innerHTML = plots.map(p => `
+    <div class="plotCard">
+      <div class="top">
+        <div>
+          <div class="name">${p.sector}${p.block ? ' · '+p.block : ''}</div>
+          <div class="meta">${p.type} · ${p.sizes.join(', ')} Marla</div>
+        </div>
+        <div class="price">${p.pricePerMarlaLac}L<span style="font-size:10px;color:var(--muted);font-weight:400;">/Marla</span></div>
+      </div>
+      <div class="badges">
+        <span class="pill neutral">${p.developmentStatus || 'status unknown'}</span>
+        <span class="pill ${p.nocApproved ? 'ok' : 'pending'}">${p.nocApproved ? 'NOC Approved' : 'NOC Pending'}</span>
+      </div>
+      ${p.agent?.name ? `<div class="row"><span>Agent</span><span>${p.agent.name}</span></div>` : ''}
+      <div class="actions">
+        <button data-edit="${p.id}">Edit</button>
+        <button data-del="${p.id}" class="danger">Delete</button>
+      </div>
+    </div>
+  `).join('');
+
+  rowsEl.querySelectorAll('[data-edit]').forEach(btn => {
+    btn.onclick = async () => {
+      const res = await fetch(API + '/' + btn.dataset.edit);
+      const { plot } = await res.json();
+      fillForm(plot);
+    };
+  });
+  // Two-tap in-page confirm instead of window.confirm() — native browser
+  // dialogs can be blocked or behave unreliably depending on how this page
+  // is opened, and they look like a browser popup, not part of the app.
+  rowsEl.querySelectorAll('[data-del]').forEach(btn => {
+    btn.onclick = async () => {
+      if (btn.dataset.confirming !== '1') {
+        btn.dataset.confirming = '1';
+        btn.textContent = 'Confirm delete?';
+        btn.dataset.revertTimer = setTimeout(() => {
+          btn.dataset.confirming = '0';
+          btn.textContent = 'Delete';
+        }, 5000);
+        return;
+      }
+      clearTimeout(btn.dataset.revertTimer);
+      btn.disabled = true;
+      btn.textContent = 'Deleting...';
+      await fetch(API + '/' + btn.dataset.del, { method: 'DELETE' });
+      loadRows();
+    };
+  });
+}
+
+form.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const id = document.getElementById('id').value;
+  const body = readForm();
+  statusEl.textContent = 'Saving...';
+  try {
+    const res = await fetch(id ? `${API}/${id}` : API, {
+      method: id ? 'PUT' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if(!res.ok) throw new Error((await res.json()).message || 'Save failed');
+    statusEl.textContent = 'Saved.';
+    resetForm();
+    await loadRows();
+    showView('listings'); // straight back to the updated list, not left in the form
+  } catch (err) {
+    statusEl.textContent = 'Error: ' + err.message;
+  }
+});
+
+cancelBtn.addEventListener('click', () => { resetForm(); showView('listings'); });
+
+showView('listings'); // default page on open
+loadRows();
+</script>
+</body>
+</html>

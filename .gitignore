@@ -1,0 +1,29 @@
+# dependencies (regenerated via `npm install` in app/ and backend/)
+node_modules/
+
+# Expo
+app/.expo/
+app/dist/
+app/web-build/
+app/expo-env.d.ts
+app/app.log
+
+# backend runtime artifacts
+backend/backend.log
+backend/src/data/*.db
+
+# env files (never commit real secrets)
+.env
+.env.*
+!.env.example
+
+# Claude Code local session state (not part of the app)
+.claude/
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# native build folders Expo can regenerate
+app/ios/
+app/android/

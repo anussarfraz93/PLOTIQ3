@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PLOTIQ</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+  /* ---------- Design tokens ---------- */
+  :root{
+    --canvas:#eef1f6; --surface:#ffffff; --surface-2:#e3e8f0; --surface-hover:#d9e0ec;
+    --ink:#10162a; --ink-muted:#5b6480; --ink-faint:#8890a8;
+    --line:#d3d9e6; --line-strong:#b9c1d4;
+    --accent:#c1662a; --accent-strong:#a5541f; --accent-soft:#f3e0cf; --accent-ink:#fffaf5;
+    --good:#1f8f5f; --good-bg:#e3f5ec;
+    --shadow:0 18px 40px -18px rgba(16,22,42,.28);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --canvas:#0a0f1c; --surface:#121a2b; --surface-2:#1a2438; --surface-hover:#22304c;
+      --ink:#edf1fa; --ink-muted:#97a2c1; --ink-faint:#69739a;
+      --line:#243050; --line-strong:#334268;
+      --accent:#e2913f; --accent-strong:#f2a352; --accent-soft:#3a2a17; --accent-ink:#1a1206;
+      --good:#3fd190; --good-bg:rgba(63,209,144,.14);
+      --shadow:0 18px 40px -16px rgba(0,0,0,.55);
+    }
+  }
+  :root[data-theme="dark"]{
+    --canvas:#0a0f1c; --surface:#121a2b; --surface-2:#1a2438; --surface-hover:#22304c;
+    --ink:#edf1fa; --ink-muted:#97a2c1; --ink-faint:#69739a;
+    --line:#243050; --line-strong:#334268;
+    --accent:#e2913f; --accent-strong:#f2a352; --accent-soft:#3a2a17; --accent-ink:#1a1206;
+    --good:#3fd190; --good-bg:rgba(63,209,144,.14);
+    --shadow:0 18px 40px -16px rgba(0,0,0,.55);
+  }
+
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'IBM Plex Sans',system-ui,-apple-system,sans-serif;background:var(--canvas);
+    display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px;color:var(--ink);}
+  h1,h2,h3{font-family:'Fraunces',Georgia,serif;text-wrap:balance;margin:0;}
+  .mono{font-family:'IBM Plex Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums;}
+  button{font-family:inherit;}
+  *:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+
+  /* ---------- Device frame ---------- */
+  .phone{width:400px;max-width:100%;height:840px;background:#000;border-radius:40px;padding:8px;
+    box-shadow:var(--shadow);position:relative;}
+  .screen{width:100%;height:100%;background:var(--canvas);border-radius:32px;overflow:hidden;
+    display:flex;flex-direction:column;position:relative;}
+  .notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:120px;height:22px;
+    background:#000;border-radius:0 0 14px 14px;z-index:30;}
+
+  /* ---------- App shell ---------- */
+  .app-shell{display:flex;flex-direction:column;height:100%;}
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:16px 14px 12px 16px;background:var(--surface);border-bottom:1px solid var(--line);
+    flex-shrink:0;padding-top:26px;}
+  .brand{display:flex;align-items:center;gap:9px;}
+  .brand .mark{width:30px;height:30px;border-radius:9px;background:var(--ink);color:var(--canvas);
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .brand .mark svg{width:17px;height:17px;}
+  .brand-text h1{font-size:19px;font-weight:600;letter-spacing:.2px;line-height:1;color:var(--ink);}
+  .brand-text p{margin:3px 0 0;font-size:10.5px;color:var(--ink-muted);letter-spacing:.3px;}
+  .icon-btn{width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--surface);
+    color:var(--ink);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;
+    transition:background .15s,border-color .15s;}
+  .icon-btn:hover{background:var(--surface-hover);border-color:var(--line-strong);}
+  .icon-btn svg{width:18px;height:18px;}
+
+  .body-row{flex:1;display:flex;min-height:0;}
+
+  /* ---------- Left icon rail ---------- */
+  .rail{width:58px;flex-shrink:0;background:var(--surface);border-right:1px solid var(--line);
+    display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 0;}
+  .rail-btn{position:relative;width:42px;height:42px;border-radius:12px;border:none;background:transparent;
+    color:var(--ink-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;
+    transition:background .15s,color .15s;}
+  .rail-btn svg{width:20px;height:20px;}
+  .rail-btn:hover{background:var(--surface-2);color:var(--ink);}
+  .rail-btn.active{background:var(--ink);color:var(--canvas);}
+  .rail-btn .badge{position:absolute;top:-2px;right:-2px;min-width:16px;height:16px;padding:0 4px;
+    border-radius:8px;background:var(--accent);color:var(--accent-ink);font-size:9.5px;font-weight:700;
+    display:flex;align-items:center;justify-content:center;font-family:'IBM Plex Mono',monospace;}
+  .rail-label{font-size:8.5px;color:var(--ink-faint);margin-top:-3px;letter-spacing:.2px;}
+
+  /* ---------- Main / views ---------- */
+  .main{flex:1;min-width:0;overflow-y:auto;position:relative;}
+  .view{display:none;flex-direction:column;height:100%;}
+  .view.visible{display:flex;}
+
+  /* Chat view */
+  .chat{flex:1;overflow-y:auto;padding:16px 14px;display:flex;flex-direction:column;gap:10px;}
+  .bubble{max-width:84%;padding:11px 14px;border-radius:16px;font-size:13.5px;line-height:1.45;
+    animation:pop .22s ease;}
+  @keyframes pop{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+  .bot{align-self:flex-start;background:var(--surface);border:1px solid var(--line);color:var(--ink);
+    border-bottom-left-radius:4px;}
+  .user{align-self:flex-end;background:var(--ink);color:var(--canvas);border-bottom-right-radius:4px;font-weight:600;}
+
+  .opt-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-self:stretch;}
+  .opt-card{display:flex;flex-direction:column;align-items:flex-start;gap:8px;background:var(--surface);
+    border:1px solid var(--line);border-radius:14px;padding:11px 12px;cursor:pointer;text-align:left;
+    transition:border-color .15s,transform .1s,background .15s;}
+  .opt-card:hover{border-color:var(--accent);background:var(--surface-hover);}
+  .opt-card:active{transform:scale(.98);}
+  .opt-card .oi{width:30px;height:30px;border-radius:9px;background:var(--accent-soft);color:var(--accent-strong);
+    display:flex;align-items:center;justify-content:center;}
+  .opt-card .oi svg{width:16px;height:16px;}
+  .opt-card .ol{font-size:12.5px;font-weight:600;line-height:1.25;color:var(--ink);}
+  .opt-card .osub{font-size:10.5px;color:var(--ink-muted);}
+
+  .free-row{display:flex;gap:8px;align-self:stretch;}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;
+    align-self:stretch;margin-top:2px;position:relative;}
+  .card h3{margin:0 0 2px;font-size:16px;color:var(--ink);}
+  .card .meta{font-size:11.5px;color:var(--ink-muted);margin-bottom:8px;}
+  .card .row{display:flex;justify-content:space-between;gap:10px;font-size:12.5px;padding:6px 0;
+    border-top:1px dashed var(--line);}
+  .card .row span:first-child{color:var(--ink-muted);flex-shrink:0;}
+  .card .row span:last-child{text-align:right;color:var(--ink);}
+  .match-badge{display:inline-flex;align-items:center;gap:5px;background:var(--good-bg);color:var(--good);
+    font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px;margin-bottom:8px;font-family:'IBM Plex Mono',monospace;}
+  .save-btn{position:absolute;top:12px;right:12px;width:30px;height:30px;border-radius:9px;border:1px solid var(--line);
+    background:var(--surface);color:var(--ink-muted);display:flex;align-items:center;justify-content:center;cursor:pointer;}
+  .save-btn svg{width:15px;height:15px;}
+  .save-btn.saved{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-strong);}
+
+  .footer-note{padding:8px 16px 12px;font-size:10px;color:var(--ink-faint);text-align:center;
+    border-top:1px solid var(--line);flex-shrink:0;background:var(--surface);}
+
+  /* Footer nav bar — Back / Home / Menu, always available so a wrong tap is never a dead end */
+  .bottombar{display:flex;justify-content:space-around;align-items:center;flex-shrink:0;
+    padding:10px 10px calc(10px + env(safe-area-inset-bottom,0px));background:var(--surface);border-top:1px solid var(--line);}
+  .bottombar-btn{display:flex;align-items:center;justify-content:center;background:none;border:none;
+    color:var(--ink-muted);cursor:pointer;width:46px;height:40px;border-radius:12px;transition:background .15s,color .15s;}
+  .bottombar-btn:hover{background:var(--surface-2);color:var(--ink);}
+  .bottombar-btn:active{transform:scale(.95);}
+  .bottombar-btn svg{width:21px;height:21px;}
+  .bottombar-btn.disabled{opacity:.35;pointer-events:none;}
+
+  /* Empty state (shared) */
+  .empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:10px;padding:30px;text-align:center;color:var(--ink-muted);}
+  .empty .oi-lg{width:52px;height:52px;border-radius:16px;background:var(--surface-2);color:var(--ink-faint);
+    display:flex;align-items:center;justify-content:center;}
+  .empty .oi-lg svg{width:24px;height:24px;}
+  .empty p{font-size:12.5px;max-width:220px;}
+
+  /* Saved view */
+  .list-view{flex:1;overflow-y:auto;padding:16px 14px;display:flex;flex-direction:column;gap:10px;}
+  .list-header{padding:2px 2px 4px;}
+  .list-header h2{font-size:18px;}
+  .list-header p{font-size:11.5px;color:var(--ink-muted);margin-top:3px;}
+
+  /* Insights view */
+  .stat-row{display:flex;flex-direction:column;gap:6px;background:var(--surface);border:1px solid var(--line);
+    border-radius:14px;padding:12px 14px;}
+  .stat-row .top{display:flex;justify-content:space-between;align-items:baseline;}
+  .stat-row .label{font-size:12.5px;font-weight:600;color:var(--ink);}
+  .stat-row .val{font-size:12.5px;color:var(--ink-muted);}
+  .sector-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;}
+  .sector-tag{font-size:10px;font-weight:600;color:var(--ink-muted);background:var(--surface-2);
+    border:1px solid var(--line);border-radius:20px;padding:3px 9px;font-family:'IBM Plex Mono',monospace;
+    white-space:nowrap;}
+  .sector-tag b{color:var(--ink);font-weight:600;}
+  .bar-track{height:7px;border-radius:4px;background:var(--surface-2);overflow:hidden;}
+  .bar-fill{height:100%;border-radius:4px;background:var(--accent);}
+  .insight-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px;
+    display:flex;gap:12px;align-items:flex-start;}
+  .insight-card .oi{width:34px;height:34px;border-radius:10px;background:var(--accent-soft);color:var(--accent-strong);
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .insight-card .oi svg{width:17px;height:17px;}
+  .insight-card p{margin:0;font-size:12px;color:var(--ink-muted);line-height:1.5;}
+  .insight-card strong{color:var(--ink);}
+
+  /* Compare view — a scoreboard read top-to-bottom by spec, left-to-right by
+     plot; specs stay pinned on the left as you scroll wide comparisons. */
+  /* Compare cards — stacked vertically like everywhere else in the app, so
+     seeing every saved plot is one scroll down, never a scroll sideways. */
+  .compare-badges{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;}
+  .compare-badge{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;
+    padding:3px 9px;border-radius:20px;font-family:'IBM Plex Mono',monospace;}
+  .compare-badge svg{width:11px;height:11px;}
+  .compare-badge.price{background:var(--good-bg);color:var(--good);}
+  .compare-badge.distance{background:var(--accent-soft);color:var(--accent-strong);}
+
+  /* ---------- Drawer ---------- */
+  .overlay{position:absolute;inset:0;background:rgba(8,12,22,.45);opacity:0;pointer-events:none;
+    transition:opacity .2s;z-index:40;}
+  .overlay.open{opacity:1;pointer-events:auto;}
+  .drawer{position:absolute;top:0;right:0;bottom:0;width:76%;max-width:280px;background:var(--surface);
+    transform:translateX(100%);transition:transform .25s ease;z-index:50;display:flex;flex-direction:column;
+    box-shadow:-16px 0 32px -12px rgba(0,0,0,.35);}
+  .drawer.open{transform:translateX(0);}
+  .drawer-head{padding:22px 16px 14px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:flex-start;}
+  .drawer-head h2{font-size:17px;}
+  .drawer-head p{font-size:11px;color:var(--ink-muted);margin-top:3px;}
+  .drawer-nav{padding:10px;display:flex;flex-direction:column;gap:2px;overflow-y:auto;flex:1;}
+  .drawer-item{display:flex;align-items:center;gap:11px;padding:11px 10px;border-radius:10px;border:none;
+    background:none;color:var(--ink);font-size:13.5px;font-weight:500;cursor:pointer;text-align:left;width:100%;}
+  .drawer-item:hover{background:var(--surface-2);}
+  .drawer-item .di{width:30px;height:30px;border-radius:9px;background:var(--surface-2);color:var(--ink-muted);
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+  .drawer-item .di svg{width:15px;height:15px;}
+  .drawer-item .badge{margin-left:auto;background:var(--accent-soft);color:var(--accent-strong);font-size:10px;
+    font-weight:700;padding:2px 7px;border-radius:10px;font-family:'IBM Plex Mono',monospace;}
+  .drawer-divider{height:1px;background:var(--line);margin:8px 4px;}
+  .drawer-foot{padding:14px 16px 18px;font-size:10.5px;color:var(--ink-faint);border-top:1px solid var(--line);}
+
+  /* Toast */
+  .toast{position:absolute;left:50%;bottom:18px;transform:translateX(-50%) translateY(10px);
+    background:var(--ink);color:var(--canvas);font-size:12px;font-weight:500;padding:9px 16px;
+    border-radius:20px;opacity:0;transition:opacity .2s, transform .2s;z-index:60;pointer-events:none;
+    white-space:nowrap;box-shadow:0 10px 24px -8px rgba(0,0,0,.4);}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  ::-webkit-scrollbar{width:6px;}
+  ::-webkit-scrollbar-thumb{background:var(--line-strong);border-radius:3px;}
+  @media (prefers-reduced-motion: reduce){ *{animation-duration:.001ms !important;transition-duration:.001ms !important;} }
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="screen">
+    <div class="notch"></div>
+    <div class="app-shell" id="app">
+
+      <div class="topbar">
+        <div class="brand">
+          <div class="mark">${'{ICON_COMPASS}'}</div>
+          <div class="brand-text">
+            <h1>PLOTIQ</h1>
+            <p>LAND INTELLIGENCE · ISLAMABAD</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="body-row">
+        <nav class="rail" id="rail">
+          <button class="rail-btn active" data-view="chat" title="Land Finder">${'{ICON_SEARCH}'}</button>
+          <button class="rail-btn" data-view="saved" title="Saved Plots">${'{ICON_BOOKMARK}'}<span class="badge" id="savedBadge" style="display:none;">0</span></button>
+          <button class="rail-btn" data-view="insights" title="Market Insights">${'{ICON_CHART}'}</button>
+          <button class="rail-btn" data-view="compare" title="Compare Plots">${'{ICON_LAYERS}'}</button>
+        </nav>
+
+        <div class="main">
+
+          <div class="view visible" id="view-chat">
+            <div class="chat" id="chat"></div>
+            <div class="footer-note">PLOTIQ Advisor · matches scored against Islamabad plot data</div>
+          </div>
+
+          <div class="view" id="view-saved"></div>
+          <div class="view" id="view-insights"></div>
+          <div class="view" id="view-compare"></div>
+
+        </div>
+      </div>
+
+      <div class="bottombar" id="bottombar"></div>
+
+      <div class="overlay" id="overlay"></div>
+      <div class="drawer" id="drawer">
+        <div class="drawer-head">
+          <div>
+            <h2>Menu</h2>
+            <p>Everything PLOTIQ can do</p>
+          </div>
+          <button class="icon-btn" id="closeDrawer" aria-label="Close menu">${'{ICON_CLOSE}'}</button>
+        </div>
+        <div class="drawer-nav">
+          <button class="drawer-item" data-action="new"><span class="di">${'{ICON_SEARCH}'}</span>New search</button>
+          <button class="drawer-item" data-action="view-saved"><span class="di">${'{ICON_BOOKMARK}'}</span>Saved plots<span class="badge" id="drawerSavedBadge" style="display:none;">0</span></button>
+          <button class="drawer-item" data-action="view-insights"><span class="di">${'{ICON_CHART}'}</span>Market insights</button>
+          <button class="drawer-item" data-action="view-compare"><span class="di">${'{ICON_LAYERS}'}</span>Compare plots</button>
+          <div class="drawer-divider"></div>
+          <button class="drawer-item" data-action="house"><span class="di">${'{ICON_HOUSE}'}</span>Find land for a house</button>
+          <button class="drawer-item" data-action="factory"><span class="di">${'{ICON_FACTORY}'}</span>Find land for a factory</button>
+          <button class="drawer-item" data-action="shop"><span class="di">${'{ICON_SHOP}'}</span>Find land for a shop</button>
+          <button class="drawer-item" data-action="farmhouse"><span class="di">${'{ICON_TREE}'}</span>Find land for a farmhouse</button>
+        </div>
+        <div class="drawer-foot">PLOTIQ Prototype · rule-based demo logic</div>
+      </div>
+
+      <div class="toast" id="toast"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ================= Icons =================
+const ICONS = {
+  compass:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15 9l-2.2 6-3.8 1.5L11 10z" fill="currentColor" stroke="none"/></svg>',
+  menu:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg>',
+  arrowLeft:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/><path d="M8 12h9"/></svg>',
+  close:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  search:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.3-4.3"/></svg>',
+  bookmark:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h12v16l-6-4-6 4z"/></svg>',
+  bookmarkFill:'<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M6 4h12v16l-6-4-6 4z"/></svg>',
+  chart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19V10M12 19V5M19 19v-7"/></svg>',
+  layers:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4.5-8 4.5-8-4.5z"/><path d="M4 12l8 4.5 8-4.5"/><path d="M4 16.5L12 21l8-4.5"/></svg>',
+  house:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 11.5L12 4l8 7.5"/><path d="M6 10v9h12v-9"/><path d="M10 19v-5h4v5"/></svg>',
+  coins:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="8" width="14" height="9" rx="2"/><path d="M8 8V6a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-2"/><path d="M9 12.5h4"/></svg>',
+  shop:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9l1.2-4.5h13.6L20 9"/><path d="M4 9a2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0 2 2 0 0 0 4 0"/><path d="M5.5 9V19h13V9"/><path d="M10 19v-5h4v5"/></svg>',
+  factory:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V12l4.5 3V12L13 15V9l7-3v14z"/><path d="M4 20h16"/><path d="M17 6V3"/></svg>',
+  tree:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l4 6h-2.5l3.5 5.5h-3L17 19H7l3-4.5H7L10.5 9H8z"/><path d="M12 19v2"/></svg>',
+  mapPin:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.6 7-11.5A7 7 0 0 0 5 9.5C5 14.4 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.3"/></svg>',
+  shield:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/></svg>',
+  leaf:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 4C10 4 4 10 4 18c8 0 14-6 14-14z"/><path d="M9 19c0-6 3-10 9-12"/></svg>',
+  tag:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3h6a1 1 0 0 1 1 1v6l-9.5 9.5a1.5 1.5 0 0 1-2 0L3.5 15.5a1.5 1.5 0 0 1 0-2z"/><circle cx="16" cy="8" r="1.3"/></svg>',
+  trendingUp:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16l6-6 4 4 6-7"/><path d="M15 7h5v5"/></svg>',
+  building:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="12" height="16"/><path d="M9 8h1M14 8h1M9 12h1M14 12h1M9 16h1M14 16h1"/></svg>',
+  truck:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h11v9H3z"/><path d="M14 11h4l3 3v2h-7z"/><circle cx="7" cy="18" r="1.6"/><circle cx="18" cy="18" r="1.6"/></svg>',
+  bolt:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 3L5 13h5l-1 8 8-10h-5z"/></svg>',
+  mountain:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 19l6-10 4 6 2-3 6 7z"/></svg>',
+  refresh:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 0 1 14-5.3M20 12a8 8 0 0 1-14 5.3"/><path d="M17 4v4h-4M7 20v-4h4"/></svg>',
+  inbox:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h4l2 3h4l2-3h4"/><path d="M4 12l1.5-6h13L20 12v6H4z"/></svg>',
+  info:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 8v.01"/></svg>',
+  trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13"/></svg>',
+};
+function icon(name){ return ICONS[name] || ''; }
+function barsIcon(level, max){ // magnitude icon: filled bars out of max
+  const w=3.4, gap=2.2, h0=6; let bars='';
+  for(let i=0;i<max;i++){
+    const bh = h0 + i*3.6;
+    const x = 2 + i*(w+gap);
+    const y = 20 - bh;
+    const on = i < level;
+    bars += `<rect x="${x}" y="${y}" width="${w}" height="${bh}" rx="1" fill="${on?'currentColor':'none'}" stroke="currentColor" stroke-width="1.3"/>`;
+  }
+  return `<svg viewBox="0 0 24 24">${bars}</svg>`;
+}
+
+// swap placeholder tokens in static markup for their icon svg
+document.body.innerHTML = document.body.innerHTML
+  .replaceAll('${\'{ICON_COMPASS}\'}', icon('compass'))
+  .replaceAll('${\'{ICON_MENU}\'}', icon('menu'))
+  .replaceAll('${\'{ICON_CLOSE}\'}', icon('close'))
+  .replaceAll('${\'{ICON_SEARCH}\'}', icon('search'))
+  .replaceAll('${\'{ICON_BOOKMARK}\'}', icon('bookmark'))
+  .replaceAll('${\'{ICON_CHART}\'}', icon('chart'))
+  .replaceAll('${\'{ICON_LAYERS}\'}', icon('layers'))
+  .replaceAll('${\'{ICON_HOUSE}\'}', icon('house'))
+  .replaceAll('${\'{ICON_FACTORY}\'}', icon('factory'))
+  .replaceAll('${\'{ICON_SHOP}\'}', icon('shop'))
+  .replaceAll('${\'{ICON_TREE}\'}', icon('tree'));
+
+// ================= Mock Islamabad plot data =================
+const PLOTS = [
+  // residential
+  {id:1, sector:"DHA Phase 2", type:"residential", sizes:[5,7,10,14], pricePerMarlaLac:22, vibe:["gated","quiet"], distance:"20 min from city center"},
+  {id:2, sector:"G-13", type:"residential", sizes:[5,7], pricePerMarlaLac:14, vibe:["affordable"], distance:"15 min from city center"},
+  {id:3, sector:"F-11", type:"residential", sizes:[10,14,20], pricePerMarlaLac:45, vibe:["central","gated"], distance:"5 min from city center"},
+  {id:4, sector:"Bahria Town Phase 8", type:"residential", sizes:[5,7,10,14], pricePerMarlaLac:16, vibe:["gated","affordable"], distance:"35 min from city center"},
+  {id:5, sector:"B-17 Multi Gardens", type:"residential", sizes:[5,7,10], pricePerMarlaLac:11, vibe:["affordable"], distance:"30 min from city center"},
+  {id:6, sector:"E-11", type:"residential", sizes:[10,14,20], pricePerMarlaLac:38, vibe:["quiet","central"], distance:"10 min from city center"},
+  {id:7, sector:"Top City-1", type:"residential", sizes:[5,7,10], pricePerMarlaLac:13, vibe:["affordable"], distance:"25 min from city center"},
+  {id:8, sector:"PWD Housing", type:"residential", sizes:[5,7,10], pricePerMarlaLac:15, vibe:["affordable","quiet"], distance:"20 min from city center"},
+  // commercial
+  {id:9, sector:"Blue Area", type:"commercial", sizes:[3,5,7,10], pricePerMarlaLac:120, vibe:["central","high-traffic","established"], distance:"0 min · city center"},
+  {id:10, sector:"I-8 Markaz", type:"commercial", sizes:[3,5,7], pricePerMarlaLac:60, vibe:["established","near-residential"], distance:"12 min from city center"},
+  {id:11, sector:"F-10 Markaz", type:"commercial", sizes:[3,5], pricePerMarlaLac:90, vibe:["central","established","high-traffic"], distance:"8 min from city center"},
+  {id:12, sector:"Bahria Town Commercial", type:"commercial", sizes:[3,5,7], pricePerMarlaLac:25, vibe:["near-residential","affordable"], distance:"35 min from city center"},
+  // industrial
+  {id:13, sector:"I-9 Industrial Area", type:"industrial", sizes:[20,30,40], pricePerMarlaLac:9, vibe:["established","utilities","logistics"], distance:"18 min from city center"},
+  {id:14, sector:"I-10 Industrial Area", type:"industrial", sizes:[20,35,50], pricePerMarlaLac:10, vibe:["established","utilities"], distance:"20 min from city center"},
+  {id:15, sector:"Hattar Economic Zone", type:"industrial", sizes:[40,80,150,200], pricePerMarlaLac:4, vibe:["affordable","logistics","utilities"], distance:"55 min from city center"},
+  {id:16, sector:"Tarnol Industrial Triangle", type:"industrial", sizes:[30,60,100], pricePerMarlaLac:6, vibe:["logistics","affordable"], distance:"30 min from city center"},
+  // farmhouse
+  {id:17, sector:"Bani Gala", type:"farmhouse", sizes:[20,40,80], pricePerMarlaLac:9, vibe:["quiet","scenic"], distance:"25 min from city center"},
+  {id:18, sector:"Gulberg Greens", type:"farmhouse", sizes:[20,40,80,150], pricePerMarlaLac:12, vibe:["farmhouse-gated","quiet"], distance:"40 min from city center"},
+  {id:19, sector:"Chak Shahzad", type:"farmhouse", sizes:[10,20,40], pricePerMarlaLac:14, vibe:["scenic","quiet"], distance:"22 min from city center"},
+];
+
+// ================= Conversation model =================
+const STEP1 = {
+  bot:"Salam! I'm PLOTIQ 🧭. Tell me what you're building and I'll match you to the right land in Islamabad.",
+  options:[
+    {label:"A family home", sub:"To live in", value:"residential", tag:"family", icon:"house"},
+    {label:"Rental / investment", sub:"Residential resale", value:"residential", tag:"investment", icon:"coins"},
+    {label:"A shop or plaza", sub:"Retail / commercial", value:"commercial", tag:"business", icon:"shop"},
+    {label:"A factory", sub:"Industrial facility", value:"industrial", tag:"production", icon:"factory"},
+    {label:"A farmhouse", sub:"Weekend / estate", value:"farmhouse", tag:"weekend", icon:"tree"},
+  ]
+};
+
+const SCALE_BY_TYPE = {
+  residential:{ bot:"How many people will the house need to hold?", options:[
+    {label:"Just me / a couple", sub:"1–2 people", range:[5,7]},
+    {label:"Small family", sub:"3–4 people", range:[7,10]},
+    {label:"Large family", sub:"5–7 people", range:[10,14]},
+    {label:"Joint family", sub:"8+ people", range:[14,20]},
+  ]},
+  commercial:{ bot:"What scale of commercial space are you planning?", options:[
+    {label:"Kiosk / small shop", sub:"Single unit", range:[3,5]},
+    {label:"Showroom", sub:"Mid-size retail", range:[5,7]},
+    {label:"Retail plaza", sub:"Multi-unit", range:[7,10]},
+    {label:"Commercial plaza", sub:"Multi-story", range:[10,16]},
+  ]},
+  industrial:{ bot:"What scale of factory or industrial unit do you need?", options:[
+    {label:"Small workshop", sub:"Light manufacturing", range:[20,35]},
+    {label:"Medium factory", sub:"Full production line", range:[35,60]},
+    {label:"Large plant", sub:"Heavy industry", range:[60,100]},
+    {label:"Logistics hub", sub:"Warehousing / mega unit", range:[100,200]},
+  ]},
+  farmhouse:{ bot:"What scale of farmhouse are you picturing?", options:[
+    {label:"Weekend getaway", sub:"Small retreat", range:[10,20]},
+    {label:"Family farmhouse", sub:"Regular use", range:[20,40]},
+    {label:"Estate farmhouse", sub:"Large grounds", range:[40,80]},
+    {label:"Large estate", sub:"Working land", range:[80,150]},
+  ]},
+};
+
+const BUDGET_STEP = { bot:"What's your budget for the plot itself, roughly?", options:[
+  {label:"Under 1.5 crore", sub:"Entry level", value:150},
+  {label:"1.5 – 3 crore", sub:"Mid range", value:300},
+  {label:"3 – 6 crore", sub:"Premium", value:600},
+  {label:"6 – 12 crore", sub:"High end", value:1200},
+]};
+
+const VIBE_BY_TYPE = {
+  residential:[
+    {label:"Close to city center", tag:"central", icon:"mapPin"},
+    {label:"Gated, family-friendly", tag:"gated", icon:"shield"},
+    {label:"Quiet, green, peaceful", tag:"quiet", icon:"leaf"},
+    {label:"Affordable, developing", tag:"affordable", icon:"tag"},
+  ],
+  commercial:[
+    {label:"High footfall, central", tag:"high-traffic", icon:"trendingUp"},
+    {label:"Established business hub", tag:"established", icon:"building"},
+    {label:"Near residential catchment", tag:"near-residential", icon:"mapPin"},
+    {label:"Affordable, developing", tag:"affordable", icon:"tag"},
+  ],
+  industrial:[
+    {label:"Highway / logistics access", tag:"logistics", icon:"truck"},
+    {label:"Established industrial zone", tag:"established", icon:"building"},
+    {label:"Utilities ready", tag:"utilities", icon:"bolt"},
+    {label:"Affordable, developing", tag:"affordable", icon:"tag"},
+  ],
+  farmhouse:[
+    {label:"Quiet, green, peaceful", tag:"quiet", icon:"leaf"},
+    {label:"Scenic, riverside views", tag:"scenic", icon:"mountain"},
+    {label:"Gated farmhouse community", tag:"farmhouse-gated", icon:"shield"},
+    {label:"Affordable, developing", tag:"affordable", icon:"tag"},
+  ],
+};
+
+const TYPE_LABEL = {residential:"Residential", commercial:"Commercial", industrial:"Industrial", farmhouse:"Farmhouse"};
+
+let answers = {};
+let stepIndex = 0;
+const chatEl = document.getElementById('chat');
+
+function addBubble(text, who){
+  const b = document.createElement('div');
+  b.className = 'bubble ' + who;
+  b.textContent = text;
+  chatEl.appendChild(b);
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+function addOptionGrid(options, onPick, levels){
+  const wrap = document.createElement('div');
+  wrap.className = 'opt-grid';
+  options.forEach((opt, i)=>{
+    const btn = document.createElement('button');
+    btn.className = 'opt-card';
+    const oi = document.createElement('div'); oi.className='oi';
+    oi.innerHTML = opt.icon ? icon(opt.icon) : (levels ? barsIcon(i+1, options.length) : icon('tag'));
+    const ol = document.createElement('div'); ol.className='ol'; ol.textContent = opt.label;
+    const osub = document.createElement('div'); osub.className='osub'; osub.textContent = opt.sub || '';
+    btn.append(oi, ol, osub);
+    btn.onclick = ()=>{
+      wrap.remove();
+      addBubble(opt.label, 'user');
+      onPick(opt);
+    };
+    wrap.appendChild(btn);
+  });
+  chatEl.appendChild(wrap);
+  chatEl.scrollTop = chatEl.scrollHeight;
+}
+
+// Each step has its own renderer so Back can re-show a prior question with
+// working option buttons — restoring innerHTML would lose click handlers,
+// so undo re-runs the same render function instead of replaying markup.
+// Each renderer records its OWN start position (before it adds anything) —
+// that's the exact point undo must truncate back to so the re-render
+// replaces the old question instead of stacking on top of it.
+let stepMark = {};
+function showPurposeStep(){
+  stepMark.purpose = chatEl.children.length;
+  addBubble(STEP1.bot, 'bot');
+  addOptionGrid(STEP1.options, onPurpose, false);
+}
+function showScaleStep(){
+  stepMark.scale = chatEl.children.length;
+  const step = SCALE_BY_TYPE[answers.purpose.value];
+  addBubble(step.bot, 'bot');
+  addOptionGrid(step.options, onScale, true);
+}
+function showBudgetStep(){
+  stepMark.budget = chatEl.children.length;
+  addBubble(BUDGET_STEP.bot, 'bot');
+  addOptionGrid(BUDGET_STEP.options, onBudget, true);
+}
+function showVibeStep(){
+  stepMark.vibe = chatEl.children.length;
+  const vibes = VIBE_BY_TYPE[answers.purpose.value];
+  addBubble("Any preference on location or vibe?", 'bot');
+  addOptionGrid(vibes, onVibe, false);
+}
+
+// Undo stack for the questionnaire itself — separate from view navigation.
+// Each entry says: "to undo the step now showing, truncate back to before
+// THIS step was rendered, clear its answer, and re-show it fresh."
+let chatCheckpoints = [];
+function pushCheckpoint(clearKey){
+  chatCheckpoints.push({ childCount: stepMark[clearKey], clearKey });
+}
+const STEP_SHOW_FN = {purpose:showPurposeStep, scale:showScaleStep, budget:showBudgetStep, vibe:showVibeStep};
+
+function startChat(presetPurpose){
+  chatEl.innerHTML = '';
+  answers = {};
+  viewHistory = [];
+  chatCheckpoints = [];
+  stepMark = {};
+  updateBottombar();
+  if(presetPurpose){
+    const opt = STEP1.options.find(o=>o.value===presetPurpose || o.icon===presetPurposeIcon(presetPurpose));
+  }
+  showPurposeStep();
+}
+function presetPurposeIcon(p){ return p; }
+
+function onPurpose(opt){
+  answers.purpose = opt;
+  setTimeout(()=>{
+    pushCheckpoint('purpose');
+    showScaleStep();
+    updateBottombar();
+  }, 280);
+}
+function onScale(opt){
+  answers.scale = opt;
+  setTimeout(()=>{
+    pushCheckpoint('scale');
+    showBudgetStep();
+    updateBottombar();
+  }, 280);
+}
+function onBudget(opt){
+  answers.budget = opt;
+  setTimeout(()=>{
+    pushCheckpoint('budget');
+    showVibeStep();
+    updateBottombar();
+  }, 280);
+}
+function onVibe(opt){
+  answers.vibe = opt;
+  setTimeout(()=>{
+    pushCheckpoint('vibe');
+    showRecommendation();
+    updateBottombar();
+  }, 280);
+}
+
+function scorePlot(plot){
+  if(plot.type !== answers.purpose.value) return null;
+  let score = 0;
+  const reasons = [];
+
+  const minSize = Math.min(...plot.sizes);
+  const minCost = minSize * plot.pricePerMarlaLac;
+  if(minCost > answers.budget.value * 1.2) return null;
+  score += Math.max(0, 28 - Math.abs(minCost - answers.budget.value) / 12);
+
+  const [lo, hi] = answers.scale.range;
+  const mid = (lo+hi)/2;
+  const bestSize = plot.sizes.find(s => s >= lo && s <= hi) || plot.sizes.reduce((a,b)=>Math.abs(b-mid)<Math.abs(a-mid)?b:a);
+  const sizeDelta = Math.min(...plot.sizes.map(s=>Math.abs(s-mid)));
+  score += Math.max(0, 27 - sizeDelta/2);
+  if(plot.sizes.some(s=>s>=lo && s<=hi)) reasons.push(`has ${bestSize}-Marla plots in your scale`);
+
+  if(plot.vibe.includes(answers.vibe.tag)){
+    score += 25;
+    reasons.push(`matches "${answers.vibe.label}"`);
+  }
+
+  if(answers.purpose.tag === 'investment' && plot.vibe.includes('affordable')){ score += 10; reasons.push('developing area, strong resale upside'); }
+  if(answers.purpose.tag === 'business' && plot.vibe.includes('high-traffic')){ score += 10; reasons.push('high footfall for business'); }
+  if(answers.purpose.tag === 'weekend' && plot.vibe.includes('scenic')){ score += 10; reasons.push('scenic weekend setting'); }
+  if(answers.purpose.tag === 'production' && plot.vibe.includes('logistics')){ score += 10; reasons.push('strong logistics access'); }
+
+  score += 10;
+  return {plot, score, bestSize, reasons};
+}
+
+function matchCardHTML(r, opts){
+  opts = opts || {};
+  const totalCostLac = (r.bestSize * r.plot.pricePerMarlaLac).toFixed(0);
+  const saved = isSaved(r.plot.id);
+  return `
+    <div class="card" data-plot="${r.plot.id}" data-size="${r.bestSize}">
+      <button class="save-btn ${saved?'saved':''}" data-save="${r.plot.id}" aria-label="Save plot">${saved?icon('bookmarkFill'):icon('bookmark')}</button>
+      ${opts.badge!==false ? `<span class="match-badge">${opts.badgeLabel || 'Match'} · ${Math.min(99, Math.round(r.score))}% fit</span>` : ''}
+      <h3>${r.plot.sector}</h3>
+      <div class="meta">${TYPE_LABEL[r.plot.type]} · ${r.plot.distance}</div>
+      <div class="row"><span>Recommended size</span><span>${r.bestSize} Marla</span></div>
+      <div class="row"><span>Est. price</span><span class="mono">~${r.plot.pricePerMarlaLac} lac/Marla (${totalCostLac} lac total)</span></div>
+      ${r.reasons && r.reasons.length ? `<div class="row"><span>Why</span><span>${r.reasons.join('; ')}</span></div>` : ''}
+    </div>`;
+}
+
+function showRecommendation(){
+  addBubble("Crunching that against Islamabad land data...", 'bot');
+  setTimeout(()=>{
+    const results = PLOTS.map(scorePlot).filter(Boolean).sort((a,b)=>b.score-a.score).slice(0,3);
+    if(results.length === 0){
+      addBubble("I couldn't find a plot matching all your criteria — try a higher budget or a different vibe.", 'bot');
+      return;
+    }
+    const [lo,hi] = answers.scale.range;
+    addBubble(`You need a ${TYPE_LABEL[answers.purpose.value]} plot, roughly ${lo}-${hi} Marla. Here are your best matches:`, 'bot');
+    results.forEach((r, i)=>{
+      const wrap = document.createElement('div');
+      wrap.innerHTML = matchCardHTML(r, {badgeLabel: i===0 ? 'Top Match' : 'Match ' + (i+1)});
+      chatEl.appendChild(wrap.firstElementChild);
+    });
+    chatEl.scrollTop = chatEl.scrollHeight;
+  }, 650);
+}
+
+// ================= Saved plots =================
+// The in-memory array is the source of truth for this running session — the
+// Saved view always reflects it immediately. localStorage is a best-effort
+// extra so the list also survives a reload; when a browser/embed context
+// blocks it (private tabs, a sandboxed preview), saving still works correctly
+// within the session, it just won't survive a full page reload.
+function loadSaved(){ try{ return JSON.parse(localStorage.getItem('plotiq_saved_v1')) || []; }catch(e){ return []; } }
+function persistSaved(){ try{ localStorage.setItem('plotiq_saved_v1', JSON.stringify(savedPlots)); }catch(e){ /* best effort only */ } }
+let savedPlots = loadSaved();
+function isSaved(plotId){ return savedPlots.some(s=>s.plotId===plotId); }
+function toggleSave(plotId, size){
+  const idx = savedPlots.findIndex(s=>s.plotId===plotId);
+  if(idx>-1){ savedPlots.splice(idx,1); persistSaved(); refreshSavedUI(); showToast('Removed from saved'); return false; }
+  savedPlots.push({plotId, size, savedAt:Date.now()});
+  persistSaved();
+  refreshSavedUI();
+  showToast('Saved to your list');
+  return true;
+}
+function refreshSavedUI(){
+  const count = savedPlots.length;
+  [document.getElementById('savedBadge'), document.getElementById('drawerSavedBadge')].forEach(b=>{
+    if(!b) return;
+    b.textContent = count;
+    b.style.display = count>0 ? 'flex' : 'none';
+  });
+  document.querySelectorAll('.save-btn').forEach(btn=>{
+    const id = Number(btn.dataset.save);
+    const on = isSaved(id);
+    btn.classList.toggle('saved', on);
+    btn.innerHTML = on ? icon('bookmarkFill') : icon('bookmark');
+  });
+  if(currentView==='saved') renderSavedView();
+}
+
+function renderSavedView(){
+  const el = document.getElementById('view-saved');
+  const list = savedPlots;
+  if(list.length===0){
+    el.innerHTML = `<div class="empty">
+      <div class="oi-lg">${icon('bookmark')}</div>
+      <h3 style="font-size:15px;">No saved plots yet</h3>
+      <p>Bookmark a match from the land finder and it'll show up here.</p>
+    </div>`;
+    return;
+  }
+  let html = `<div class="list-view"><div class="list-header"><h2>Saved plots</h2><p>${list.length} plot${list.length>1?'s':''} bookmarked on this device</p></div>`;
+  list.slice().reverse().forEach(s=>{
+    const plot = PLOTS.find(p=>p.id===s.plotId);
+    if(!plot) return;
+    const r = {plot, score:0, bestSize:s.size, reasons:[]};
+    html += matchCardHTML(r, {badge:false});
+  });
+  html += `</div>`;
+  el.innerHTML = html;
+}
+
+// ================= Insights view =================
+function renderInsightsView(){
+  const el = document.getElementById('view-insights');
+  const types = ['residential','commercial','industrial','farmhouse'];
+  const stats = types.map(t=>{
+    const plots = PLOTS.filter(p=>p.type===t);
+    const avg = plots.reduce((s,p)=>s+p.pricePerMarlaLac,0) / plots.length;
+    return {type:t, avg, count:plots.length, plots};
+  });
+  const maxAvg = Math.max(...stats.map(s=>s.avg));
+  let html = `<div class="list-view">
+    <div class="list-header"><h2>Market insights</h2><p>Average price per Marla, by land type</p></div>
+    <div class="insight-card">
+      <div class="oi">${icon('info')}</div>
+      <p>Computed live from PLOTIQ's ${PLOTS.length} tracked Islamabad sectors. Use this to sanity-check a budget before you search.</p>
+    </div>`;
+  stats.forEach(s=>{
+    const pct = Math.round((s.avg/maxAvg)*100);
+    const tags = s.plots
+      .slice().sort((a,b)=>a.pricePerMarlaLac-b.pricePerMarlaLac)
+      .map(p=>`<span class="sector-tag"><b>${p.sector}</b> · ${p.pricePerMarlaLac}L</span>`)
+      .join('');
+    html += `<div class="stat-row">
+      <div class="top"><span class="label">${TYPE_LABEL[s.type]}</span><span class="val mono">~${s.avg.toFixed(0)} lac/Marla</span></div>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div>
+      <div class="top"><span class="val" style="font-size:10.5px;">${s.count} sector${s.count>1?'s':''} tracked — this average</span></div>
+      <div class="sector-tags">${tags}</div>
+    </div>`;
+  });
+  html += `</div>`;
+  el.innerHTML = html;
+}
+
+function renderCompareView(){
+  const el = document.getElementById('view-compare');
+  const rows = savedPlots
+    .map(s => { const plot = PLOTS.find(p=>p.id===s.plotId); return plot ? {s, plot} : null; })
+    .filter(Boolean);
+
+  if(rows.length < 2){
+    el.innerHTML = `<div class="empty">
+      <div class="oi-lg">${icon('layers')}</div>
+      <h3 style="font-size:15px;">Save 2+ plots to compare</h3>
+      <p>${rows.length===0 ? "You haven't saved any plots yet." : "You've saved 1 — save at least one more."} Bookmark plots from the Land Finder, then come back here.</p>
+    </div>`;
+    return;
+  }
+
+  // annotate each saved plot with its total price and travel time, so the
+  // cheapest and closest can be flagged without any side-scrolling table
+  const parseMinutes = distance => { const m = distance.match(/(\d+)/); return m ? parseInt(m[1],10) : 999; };
+  const withStats = rows.map(r => ({
+    ...r,
+    total: r.s.size * r.plot.pricePerMarlaLac,
+    minutes: parseMinutes(r.plot.distance),
+  })).sort((a,b) => a.total - b.total); // cheapest first — the most useful read order
+
+  const cheapestTotal = Math.min(...withStats.map(r=>r.total));
+  const closestMinutes = Math.min(...withStats.map(r=>r.minutes));
+
+  let html = `<div class="list-view">
+    <div class="list-header"><h2>Compare plots</h2><p>${rows.length} saved plots, cheapest first</p></div>`;
+
+  withStats.forEach(r => {
+    const badges = [];
+    if(r.total === cheapestTotal) badges.push(`<span class="compare-badge price">${icon('tag')} Best price</span>`);
+    if(r.minutes === closestMinutes) badges.push(`<span class="compare-badge distance">${icon('mapPin')} Closest</span>`);
+    html += `
+    <div class="card">
+      <button class="save-btn saved" data-save="${r.plot.id}" data-size="${r.s.size}" aria-label="Remove from compare">${icon('bookmarkFill')}</button>
+      ${badges.length ? `<div class="compare-badges">${badges.join('')}</div>` : ''}
+      <h3>${r.plot.sector}</h3>
+      <div class="meta">${TYPE_LABEL[r.plot.type]} · ${r.plot.distance}</div>
+      <div class="row"><span>Size</span><span class="mono">${r.s.size} Marla</span></div>
+      <div class="row"><span>Price/Marla</span><span class="mono">${r.plot.pricePerMarlaLac}L</span></div>
+      <div class="row"><span>Total price</span><span class="mono">${r.total}L</span></div>
+    </div>`;
+  });
+
+  html += `</div>`;
+  el.innerHTML = html;
+}
+
+// ================= View / nav wiring =================
+let currentView = 'chat';
+let viewHistory = []; // stack of views visited, so a stray tap is always recoverable
+
+function setView(v, opts){
+  opts = opts || {};
+  if(!opts.skipHistory && v !== currentView){ viewHistory.push(currentView); }
+  currentView = v;
+  document.querySelectorAll('.view').forEach(el=>el.classList.remove('visible'));
+  document.getElementById('view-'+v).classList.add('visible');
+  document.querySelectorAll('.rail-btn').forEach(b=>b.classList.toggle('active', b.dataset.view===v));
+  if(v==='saved') renderSavedView();
+  if(v==='insights') renderInsightsView();
+  if(v==='compare') renderCompareView();
+  // Chat (the Land Finder) is "home" — arriving there by any route (rail tap,
+  // Back, Home) clears the back-stack, so Back can never bounce you into a
+  // view you already deliberately left once you're back at your work.
+  if(v === 'chat'){ viewHistory = []; }
+  closeDrawer();
+  updateBottombar();
+}
+
+function goBack(){
+  // Inside the Land Finder, Back first undoes the last answered question
+  // (returning you to it, still pickable) before it ever leaves the chat.
+  if(currentView === 'chat' && chatCheckpoints.length > 0){
+    const cp = chatCheckpoints.pop();
+    while(chatEl.children.length > cp.childCount){ chatEl.removeChild(chatEl.lastElementChild); }
+    delete answers[cp.clearKey];
+    STEP_SHOW_FN[cp.clearKey]();
+    updateBottombar();
+    return;
+  }
+  if(viewHistory.length===0){ showToast("You're already at the start"); return; }
+  const prev = viewHistory.pop();
+  setView(prev, {skipHistory:true});
+}
+function goHome(){
+  viewHistory = [];
+  setView('chat', {skipHistory:true});
+}
+function updateBottombar(){
+  const backBtn = document.getElementById('btnBack');
+  if(!backBtn) return;
+  const nothingToUndo = currentView === 'chat' ? chatCheckpoints.length===0 : viewHistory.length===0;
+  backBtn.classList.toggle('disabled', nothingToUndo);
+}
+
+document.getElementById('rail').addEventListener('click', (e)=>{
+  const btn = e.target.closest('.rail-btn');
+  if(btn) setView(btn.dataset.view);
+});
+
+const bottombarEl = document.getElementById('bottombar');
+bottombarEl.innerHTML = `
+  <button class="bottombar-btn disabled" id="btnBack" aria-label="Back">${icon('arrowLeft')}</button>
+  <button class="bottombar-btn" id="btnHome" aria-label="Home">${icon('house')}</button>
+  <button class="bottombar-btn" id="btnMenu" aria-label="Menu">${icon('menu')}</button>
+`;
+document.getElementById('btnBack').onclick = goBack;
+document.getElementById('btnHome').onclick = goHome;
+document.getElementById('btnMenu').onclick = openDrawer;
+
+document.getElementById('chat').addEventListener('click', (e)=>{
+  const saveBtn = e.target.closest('.save-btn');
+  if(saveBtn){ toggleSave(Number(saveBtn.dataset.save), Number(saveBtn.closest('.card').dataset.size)); }
+});
+document.getElementById('view-saved').addEventListener('click', (e)=>{
+  const saveBtn = e.target.closest('.save-btn');
+  if(saveBtn){ toggleSave(Number(saveBtn.dataset.save), Number(saveBtn.closest('.card').dataset.size)); }
+});
+document.getElementById('view-compare').addEventListener('click', (e)=>{
+  const saveBtn = e.target.closest('.save-btn');
+  if(saveBtn){ toggleSave(Number(saveBtn.dataset.save), Number(saveBtn.dataset.size)); renderCompareView(); }
+});
+
+const drawerEl = document.getElementById('drawer');
+const overlayEl = document.getElementById('overlay');
+function openDrawer(){ drawerEl.classList.add('open'); overlayEl.classList.add('open'); }
+function closeDrawer(){ drawerEl.classList.remove('open'); overlayEl.classList.remove('open'); }
+document.getElementById('closeDrawer').onclick = closeDrawer;
+overlayEl.onclick = closeDrawer;
+
+document.querySelectorAll('.drawer-item').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const action = btn.dataset.action;
+    if(action==='new'){ setView('chat'); startChat(); return; }
+    if(action==='view-saved'){ setView('saved'); return; }
+    if(action==='view-insights'){ setView('insights'); return; }
+    if(action==='view-compare'){ setView('compare'); return; }
+    // quick-start by purpose type
+    const map = {house:'residential', factory:'industrial', shop:'commercial', farmhouse:'farmhouse'};
+    const target = map[action];
+    if(target){
+      setView('chat');
+      chatEl.innerHTML = ''; answers = {};
+      viewHistory = []; chatCheckpoints = []; stepMark = {purpose: 0}; updateBottombar();
+      addBubble(STEP1.bot, 'bot');
+      const opt = STEP1.options.find(o=>o.value===target && (action!=='house' || o.tag==='family'));
+      setTimeout(()=>{ addBubble(opt.label, 'user'); onPurpose(opt); }, 150);
+    }
+  });
+});
+
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(()=> t.classList.remove('show'), 1800);
+}
+
+// ================= Init =================
+refreshSavedUI();
+startChat();
+</script>
+</body>
+</html>
